@@ -46,3 +46,4 @@ Thumbs.db
 
 # Local IDE/agent state
 .cursor/
+.agents/
