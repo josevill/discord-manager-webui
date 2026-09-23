@@ -27,9 +27,9 @@ discord-manager apply examples/server-config.yaml --yes
 
 ### Web UI
 
-![discord-manager WebUI — desktop layout](docs/screenshot.png)
+![discord-manager WebUI — desktop layout](docs/screenshot-desktop-channels.png)
 
-*Desktop: roles rail, channel tree with categories, the Content pane (emojis / webhooks / auto-mod), and the inspector. Phones get bottom tabs, tablets get slide-over drawers.*
+*Desktop: roles rail, channel tree with categories (channel selected — fields + overwrites editor), the Content pane (emojis / webhooks / auto-mod), and the inspector. Phones get bottom tabs, tablets get slide-over drawers, ultra-wide keeps sidebars edge-anchored. [Full screenshot gallery →](docs/screenshots.md)*
 
 Local companion visual builder (no OAuth). Edit roles, categories, channels — plus emojis, webhooks, and auto-mod rules (the Content pane) — in a Discord-like layout; Validate/Save write the same YAML the CLI uses. Image fields (guild icon/banner/splash, role icon, emoji image, webhook avatar) have a file picker that uploads into `<config dir>/assets/` and stores the relative reference. Fetch status pulls the live guild into the working config file (CloudFormation-style refresh). Fetch / Plan / Dry-run / Apply need `DISCORD_TOKEN` + `DISCORD_GUILD_ID`. Apply (and dry-run) stream per-action progress over SSE with a live progress bar in the confirm modal, and can be cancelled mid-run — cancelling stops any further Discord API calls. The Apply confirm modal also has a **prune** checkbox to delete guild resources that no longer exist in the config (same semantics as `apply --prune`).
 
