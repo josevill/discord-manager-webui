@@ -1,0 +1,164 @@
+guild:
+  name: My Server
+  description: A community for X and Y
+  preferred_locale: en-US
+  verification_level: 2
+  default_message_notifications: 1
+  explicit_content_filter: 1
+  afk_timeout: 300
+  afk_channel: null
+  system_channel: null
+  system_channel_flags: 0
+  rules_channel: null
+  public_updates_channel: null
+  premium_progress_bar_enabled: false
+roles:
+  - name: Admin
+    color: 2818303
+    hoist: true
+    mentionable: true
+    permissions: "8"
+    position: 1
+    unicode_emoji: null
+  - name: Moderator
+    color: 43775
+    hoist: true
+    mentionable: false
+    permissions: "1099511704582"
+    position: 1
+    unicode_emoji: null
+  - name: Member
+    color: 5763719
+    hoist: false
+    mentionable: false
+    permissions: "3214400"
+    position: 1
+    unicode_emoji: null
+  - name: "@everyone"
+    color: 0
+    hoist: false
+    mentionable: false
+    permissions: "66560"
+    position: 0
+    unicode_emoji: null
+categories:
+  - name: Information
+    position: 0
+    permission_overwrites:
+      - role: "@everyone"
+        allow:
+          - VIEW_CHANNEL
+          - READ_MESSAGE_HISTORY
+        deny:
+          - SEND_MESSAGES
+  - name: Community
+    position: 1
+    permission_overwrites: []
+  - name: Voice
+    position: 2
+    permission_overwrites: []
+  - name: Admin
+    position: 3
+    permission_overwrites:
+      - role: Admin
+        allow: []
+        deny:
+          - VIEW_CHANNEL
+channels:
+  - name: welcome
+    type: text
+    category: Information
+    topic: Welcome! Read the rules and introduce yourself.
+    nsfw: false
+    slowmode: 0
+    rtc_region: null
+    position: 0
+    permission_overwrites:
+      - role: "@everyone"
+        allow:
+          - VIEW_CHANNEL
+          - READ_MESSAGE_HISTORY
+        deny:
+          - SEND_MESSAGES
+      - role: Member
+        allow:
+          - SEND_MESSAGES
+        deny: []
+  - name: rules
+    type: text
+    category: Community
+    topic: Server rules — read before participating.
+    nsfw: false
+    slowmode: 0
+    rtc_region: null
+    position: 0
+    permission_overwrites:
+      - role: Admin
+        allow:
+          - SEND_MESSAGES
+          - MANAGE_MESSAGES
+        deny: []
+      - role: "@everyone"
+        allow:
+          - VIEW_CHANNEL
+          - READ_MESSAGE_HISTORY
+        deny:
+          - SEND_MESSAGES
+  - name: general
+    type: text
+    category: Community
+    topic: General discussion.
+    nsfw: false
+    slowmode: 0
+    rtc_region: null
+    position: 1
+    permission_overwrites: []
+  - name: lechat
+    type: voice
+    category: Voice
+    topic: null
+    nsfw: false
+    slowmode: 0
+    bitrate: 64000
+    user_limit: 0
+    rtc_region: null
+    position: 0
+    permission_overwrites: []
+  - name: voice-chat
+    type: voice
+    category: Voice
+    topic: null
+    nsfw: false
+    slowmode: 0
+    bitrate: 64000
+    user_limit: 10
+    rtc_region: null
+    position: 1
+    permission_overwrites: []
+  - name: mod-log
+    type: text
+    category: Admin
+    topic: null
+    nsfw: false
+    slowmode: 0
+    rtc_region: null
+    position: 0
+    permission_overwrites:
+      - role: "@everyone"
+        allow: []
+        deny:
+          - VIEW_CHANNEL
+emojis: []
+stickers: []
+webhooks: []
+auto_mod:
+  rules: []
+onboarding:
+  enabled: false
+  mode: 0
+  prompts: []
+  default_channel_ids: []
+vanity_url_code: null
+widget:
+  enabled: false
+  channel: null

@@ -1,0 +1,33 @@
+# Minimal config used by live E2E tests (prefix applied dynamically in harness)
+guild:
+  verification_level: 1
+  default_message_notifications: 1
+
+roles:
+  - name: "e2e-member"
+    color: 0x57F287
+    hoist: false
+    mentionable: false
+    permissions:
+      - VIEW_CHANNEL
+      - SEND_MESSAGES
+      - READ_MESSAGE_HISTORY
+    position: 1
+
+categories:
+  - name: "e2e-category"
+    position: 0
+
+channels:
+  - name: "e2e-general"
+    type: text
+    category: "e2e-category"
+    topic: "E2E test channel"
+    permission_overwrites:
+      - role: "@everyone"
+        allow: [VIEW_CHANNEL, READ_MESSAGE_HISTORY, SEND_MESSAGES]
+      - role: "e2e-member"
+        allow: [SEND_MESSAGES, MANAGE_MESSAGES]
+
+auto_mod:
+  rules: []

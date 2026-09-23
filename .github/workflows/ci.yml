@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Nightly live E2E against the disposable guild (secrets-gated).
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Typecheck, lint, build, tests, coverage, WebUI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint (Biome)
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit + integration + coverage gate
+        run: npm run test:coverage
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: WebUI self-tests (Playwright)
+        run: npm run test:web
+
+  e2e:
+    name: Live E2E (disposable guild)
+    # Manual (workflow_dispatch) or nightly (schedule) only — never on push/PR.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Require E2E secrets
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          E2E_ALLOW_GUILD_ID: ${{ secrets.E2E_ALLOW_GUILD_ID }}
+        run: |
+          [ -n "$DISCORD_TOKEN" ] || { echo "::error::DISCORD_TOKEN secret is required"; exit 1; }
+          [ -n "$DISCORD_GUILD_ID" ] || { echo "::error::DISCORD_GUILD_ID secret is required"; exit 1; }
+          [ -n "$E2E_ALLOW_GUILD_ID" ] || { echo "::error::E2E_ALLOW_GUILD_ID secret is required (no default-allow)"; exit 1; }
+          [ "$DISCORD_GUILD_ID" = "$E2E_ALLOW_GUILD_ID" ] || { echo "::error::E2E_ALLOW_GUILD_ID must exactly match DISCORD_GUILD_ID"; exit 1; }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run live E2E
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          E2E_ALLOW_GUILD_ID: ${{ secrets.E2E_ALLOW_GUILD_ID }}
+        run: npm run test:e2e

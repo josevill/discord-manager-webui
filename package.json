@@ -1,0 +1,80 @@
+{
+  "name": "discord-manager",
+  "version": "1.0.0",
+  "description": "Declarative Discord server reconciliation CLI",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "discord-manager": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "web/dist",
+    "examples",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc && npm run build:web",
+    "build:web": "vite build --config web/vite.config.ts",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "ui": "tsx ui.ts",
+    "ui:dev": "tsx ui.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json && tsc --noEmit -p web/tsconfig.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test": "vitest run tests/unit tests/integration",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e --no-file-parallelism",
+    "test:web": "npm run build:web && playwright test",
+    "test:coverage": "vitest run --coverage tests/unit tests/integration",
+    "e2e:cleanup": "tsx scripts/e2e-cleanup.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "discord",
+    "iac",
+    "cli",
+    "reconciliation"
+  ],
+  "author": "Jose Viloria",
+  "license": "ISC",
+  "dependencies": {
+    "@hono/node-server": "^2.0.11",
+    "chokidar": "^5.0.0",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "hono": "^4.12.32",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "optionalDependencies": {
+    "discord.js": "^14.27.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@fontsource-variable/outfit": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-v8": "^4.1.10",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

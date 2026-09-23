@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<!-- saved from url=(0088)http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#edge-cases -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discord Server Automation — Architecture &amp; API Analysis</title>
+<style>
+/* ── Reset & Base ────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f1a;
+  --bg-card: #1a1a2e;
+  --bg-code: #16213e;
+  --text: #e0e0e8;
+  --text-dim: #8888a0;
+  --accent: #5865f2;
+  --accent-light: #7986f5;
+  --green: #57f287;
+  --yellow: #fee75c;
+  --red: #ed4245;
+  --orange: #f47b20;
+  --border: #2a2a40;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Table of Contents (sidebar) ────────────────────── */
+nav.toc {
+  position: fixed;
+  top: 0; left: 0;
+  width: 280px;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  padding: 2rem 1.5rem;
+  z-index: 100;
+}
+
+nav.toc h2 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 1.2rem;
+  font-weight: 600;
+}
+
+nav.toc ol {
+  list-style: none;
+  counter-reset: toc-counter;
+}
+
+nav.toc ol li {
+  counter-increment: toc-counter;
+  margin-bottom: 0.4rem;
+}
+
+nav.toc ol li a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  display: block;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+nav.toc ol li a::before {
+  content: counter(toc-counter) ". ";
+  color: var(--accent);
+  font-weight: 600;
+}
+
+nav.toc ol li a:hover {
+  color: var(--text);
+  background: rgba(88, 101, 242, 0.1);
+}
+
+nav.toc ol li a:active { background: rgba(88, 101, 242, 0.2); }
+
+/* ── Main Content ───────────────────────────────────── */
+main {
+  margin-left: 280px;
+  flex: 1;
+  max-width: 960px;
+  padding: 3rem 3rem 6rem;
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent-light), var(--green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.3rem;
+  line-height: 1.2;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  font-size: 1.05rem;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent-light);
+  margin: 2.5rem 0 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid var(--border);
+  scroll-margin-top: 1rem;
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 2rem 0 0.8rem;
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 1.5rem 0 0.6rem;
+}
+
+p { margin-bottom: 1rem; color: var(--text); }
+
+a { color: var(--accent-light); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Cards ──────────────────────────────────────────── */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  transition: border-color 0.2s;
+}
+
+.card:hover { border-color: var(--accent); }
+
+.card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--accent-light);
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ── Code Blocks ────────────────────────────────────── */
+.code-block {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 1.2rem 0;
+  overflow: hidden;
+}
+
+.code-header {
+  background: rgba(255,255,255,0.04);
+  padding: 0.5rem 1rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.code-block pre {
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.code-block pre code {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.code-block .code-header + pre { padding-top: 0.5rem; }
+
+/* ── Tables ─────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2rem 0;
+  font-size: 0.88rem;
+}
+
+thead th {
+  background: var(--bg-card);
+  color: var(--accent-light);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.7rem 1rem;
+  border-bottom: 2px solid var(--accent);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+tbody td {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tbody tr:hover { background: rgba(88, 101, 242, 0.03); }
+
+tbody tr:last-child td { border-bottom: none; }
+
+/* ── Notes & Warnings ───────────────────────────────── */
+.note, .warning {
+  border-left: 3px solid var(--accent);
+  background: rgba(88, 101, 242, 0.06);
+  padding: 0.8rem 1.2rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 1.2rem 0;
+  font-size: 0.9rem;
+}
+
+.warning {
+  border-left-color: var(--orange);
+  background: rgba(244, 123, 32, 0.06);
+}
+
+.note strong:first-child, .warning strong:first-child {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Phase Cards ────────────────────────────────────── */
+.phase-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.phase-card p { margin-bottom: 0.8rem; }
+.phase-card ul { margin: 0.5rem 0 0.5rem 1.5rem; }
+.phase-card li { margin-bottom: 0.3rem; font-size: 0.9rem; color: var(--text-dim); }
+
+/* ── Endpoint Detail ────────────────────────────────── */
+.endpoint-detail {
+  margin: 1rem 0;
+}
+
+.endpoint-detail h4 {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--green);
+  background: rgba(87, 242, 135, 0.06);
+  display: inline-block;
+  padding: 0.2rem 0.8rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.endpoint-detail p {
+  margin: 0.6rem 0;
+}
+
+/* ── Architecture Diagram ───────────────────────────── */
+.arch-diagram pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  overflow-x: auto;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #a0a8c0;
+}
+
+/* ── Order List ─────────────────────────────────────── */
+.order-list ol {
+  counter-reset: step-counter;
+  list-style: none;
+  padding: 1rem;
+}
+
+.order-list ol li {
+  counter-increment: step-counter;
+  padding: 0.5rem 0.8rem 0.5rem 2.5rem;
+  position: relative;
+  margin-bottom: 0.3rem;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+}
+
+.order-list ol li::before {
+  content: counter(step-counter);
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--accent);
+  color: white;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── Deployment Grid ────────────────────────────────── */
+.deployment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.2rem;
+  margin: 1.5rem 0;
+}
+
+.deployment-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+.deployment-card h3 {
+  margin: 0 0 0.5rem;
+  color: var(--accent-light);
+  font-size: 1.05rem;
+}
+
+.deployment-card p {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.deployment-card ul {
+  margin: 0.6rem 0 0 1.2rem;
+}
+
+.deployment-card li {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+/* ── Edge Cases ─────────────────────────────────────── */
+.edge-case {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--yellow);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  margin: 1.2rem 0;
+}
+
+.edge-case h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--yellow);
+}
+
+.edge-case p { margin-bottom: 0.5rem; }
+.edge-case ul { margin: 0.3rem 0 0 1.2rem; }
+.edge-case li { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+
+/* ── Footer ─────────────────────────────────────────── */
+footer {
+  margin-left: 280px;
+  padding: 2rem 3rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+footer p {
+  max-width: 960px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+/* ── Lists in content ──────────────────────────────── */
+main ul, main ol {
+  margin: 0.8rem 0 0.8rem 1.5rem;
+}
+
+main li {
+  margin-bottom: 0.35rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+main li strong {
+  color: var(--text);
+}
+
+/* ── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a50; }
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  nav.toc {
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1.2rem;
+  }
+
+  nav.toc ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  nav.toc ol li { margin-bottom: 0; }
+  nav.toc ol li a { font-size: 0.8rem; padding: 0.2rem 0.4rem; }
+
+  main {
+    margin-left: 0;
+    padding: 1.5rem;
+  }
+
+  footer {
+    margin-left: 0;
+    padding: 1.2rem 1.5rem;
+  }
+
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.3rem; }
+}
+
+</style>
+</head>
+<body>
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#overview">System Overview</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#architecture">Architecture</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#config">Config Schema</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#api-endpoints">API Endpoints &amp; Payloads</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#reconciliation">Reconciliation Engine</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#permissions">Permissions Model</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#bot-setup">Bot Setup &amp; Invitation</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#rate-limits">Rate Limits &amp; Backoff</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#deployment">Deployment Models</a></li>
+    <li><a href="http://10.0.0.50:9999/files/discord-server-automation/discord-automation.html#edge-cases">Edge Cases &amp; Pitfalls</a></li>
+  </ol>
+</nav>
+
+<main>
+  <h1>Discord Server Automation</h1>
+  <p class="subtitle">Architecture, API analysis, and implementation plan for a config-driven Discord server provisioning bot.</p>
+
+  <!-- ================================================================== -->
+  <section id="overview">
+    <h2>1. System Overview</h2>
+    <p>A bot that reads a <strong>declarative configuration file</strong> describing the desired state of a Discord server (guild), then reconciles the live server to match that state — and keeps it in sync when the config changes.</p>
+    <div class="concept-grid">
+      <div class="card">
+        <h3>Declarative Config</h3>
+        <p>YAML/JSON file describing the full guild: name, roles, categories, channels, permissions, emojis, webhooks, auto-mod rules, onboarding, welcome screen.</p>
+      </div>
+      <div class="card">
+        <h3>State Reconciler</h3>
+        <p>Fetches current guild state via Discord REST API, diffs against desired config, and computes a minimal ordered action plan to converge them.</p>
+      </div>
+      <div class="card">
+        <h3>Watch Mode</h3>
+        <p>File watcher detects config changes, triggers re-reconciliation. Optional Gateway event listener detects manual Discord changes that diverge from config.</p>
+      </div>
+      <div class="card">
+        <h3>Idempotency</h3>
+        <p>Applying the same config twice produces the same result. No duplicate channels, roles, or permissions. Safe to run repeatedly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="architecture">
+    <h2>2. Architecture</h2>
+    <div class="arch-diagram">
+      <pre>┌─────────────────────────────────────────────────────────┐
+│                     USER INTERFACE                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
+│  │  CLI     │  │  Web UI  │  │  GitOps  │  │  SDK    │ │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘ │
+└───────┼──────────────┼─────────────┼──────────────┼──────┘
+        │              │             │              │
+┌───────▼──────────────▼─────────────▼──────────────▼──────┐
+│                    CORE ENGINE                             │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  Config Manager         File Watcher (inotify/kqueue)│ │
+│  │  - YAML/JSON/TOML parse  - Hot-reload on save       │ │
+│  │  - Schema validation     - Debounce rapid edits     │ │
+│  │  - Ref resolution        - Git hook integration     │ │
+│  └──────────────────────┬───────────────────────────────┘ │
+│  ┌──────────────────────▼───────────────────────────────┐ │
+│  │  State Fetcher         Discord REST API Client       │ │
+│  │  - GET guild, channels, roles, emojis, webhooks     │ │
+│  │  - Caches for diffing  - Handles pagination         │ │
+│  └──────────────────────┬───────────────────────────────┘ │
+│  ┌──────────────────────▼───────────────────────────────┐ │
+│  │  Differ / Reconciler     Core Diff Logic             │ │
+│  │  - Tree-based diff       - Dependency ordering       │ │
+│  │  - 3-way merge: config vs live vs ignore-list       │ │
+│  │  - Generates ordered ActionPlan (CREATE/UPDATE/DEL) │ │
+│  └──────────────────────┬───────────────────────────────┘ │
+│  ┌──────────────────────▼───────────────────────────────┐ │
+│  │  Executor              Rate-Limited API Caller       │ │
+│  │  - Applies ActionPlan  - Retry + exponential backoff │ │
+│  │  - Dry-run mode        - Progress reporting          │ │
+│  │  - Partial rollback on failure                       │ │
+│  └──────────────────────────────────────────────────────┘ │
+└──────────────────────────┬────────────────────────────────┘
+                           │
+┌──────────────────────────▼────────────────────────────────┐
+│              DISCORD GATEWAY (WebSocket)                   │
+│  - GUILD_CREATE: new guild, start reconciliation          │
+│  - GUILD_UPDATE: detect manual changes, flag divergence   │
+│  - CHANNEL_* / ROLE_* / GUILD_ROLE_* events              │
+│  - Auto-reconcile on timer or event threshold             │
+└───────────────────────────────────────────────────────────┘
+      </pre>
+    </div>
+
+    <h3>Reconciliation Order (Dependency-Aware)</h3>
+    <div class="order-list">
+      <ol>
+        <li><strong>Guild settings</strong> — name, icon, banner, verification level, system channel, etc.</li>
+        <li><strong>Roles</strong> — must exist before channel overwrites reference them. Position ordering applied last.</li>
+        <li><strong>Categories</strong> — parent containers for channels, created before their children.</li>
+        <li><strong>Channels</strong> — text, voice, announcement, forum, media. Assigned to categories.</li>
+        <li><strong>Permission overwrites</strong> — applied per-channel, referencing role IDs from step 2.</li>
+        <li><strong>Emojis &amp; Stickers</strong> — uploaded assets, can be role-restricted.</li>
+        <li><strong>Webhooks</strong> — created per-channel, reference channel IDs from step 4.</li>
+        <li><strong>Auto-mod rules</strong> — reference channels for alert destinations.</li>
+        <li><strong>Welcome screen &amp; Onboarding</strong> — reference channels and roles.</li>
+        <li><strong>Member role assignments</strong> — apply template roles to existing members.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="config">
+    <h2>3. Config Schema</h2>
+    <p>Declarative YAML spec. The full source of truth. Every value maps 1:1 to a Discord API field.</p>
+
+    <div class="code-block">
+      <div class="code-header">server-config.yaml</div>
+      <pre><code># ── Guild Metadata ──────────────────────────────────
+guild:
+  name: "My Server"
+  description: "A community for X and Y"
+  icon: "./assets/icon.png"        # local path → base64 upload
+  banner: "./assets/banner.png"
+  splash: "./assets/splash.png"    # invite splash
+  preferred_locale: "en-US"
+  verification_level: 2            # 0=NONE 1=LOW 2=MEDIUM 3=HIGH 4=VERY_HIGH
+  default_message_notifications: 0 # 0=ALL 1=ONLY_MENTIONS
+  explicit_content_filter: 0       # 0=DISABLED 1=ROLE_WITHOUT_ROLE 2=ALL
+  afk_timeout: 300                 # seconds
+  system_channel_flags: 0          # bitfield: 1=SUPPRESS_JOIN_NOTIFICATIONS
+  premium_progress_bar_enabled: false
+
+# ── Roles ────────────────────────────────────────────
+roles:
+  - name: "Admin"
+    color: 0xFF0000
+    hoist: true
+    mentionable: true
+    permissions: "8"               # Administrator (string for bigint)
+    position: 1
+    icon: null                     # role icon (server boost level 2+)
+    unicode_emoji: null
+  - name: "Moderator"
+    color: 0x00AAFF
+    hoist: true
+    mentionable: false
+    permissions: "4398046511103"   # computed: kick, ban, manage channels/roles/messages
+    position: 2
+  - name: "Member"
+    color: 0x57F287
+    hoist: false
+    mentionable: false
+    permissions: "1125899906842623" # standard member permissions
+    position: 3
+  - name: "Bot"
+    color: 0x5865F2
+    hoist: true
+    mentionable: false
+    permissions: "1125899906842623"
+    position: 4
+  - name: "@everyone"              # special role, modify default perms
+    permissions: "1125899906842623"
+
+# ── Categories ───────────────────────────────────────
+categories:
+  - name: "Information"
+    position: 1
+    permission_overwrites:
+      - role: "@everyone"
+        allow: ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"]
+        deny: ["SEND_MESSAGES"]
+  - name: "Community"
+    position: 2
+  - name: "Voice"
+    position: 3
+  - name: "Admin"
+    position: 4
+    permission_overwrites:
+      - role: "@everyone"
+        deny: ["VIEW_CHANNEL"]
+
+# ── Channels ─────────────────────────────────────────
+channels:
+  - name: "welcome"
+    type: "text"                   # text, voice, announcement, forum, media
+    category: "Information"
+    topic: "Welcome! Read the rules and introduce yourself."
+    nsfw: false
+    slowmode: 0                    # seconds between messages
+    default_auto_archive_duration: 4320  # minutes (for threads)
+    permission_overwrites:
+      - role: "@everyone"
+        allow: ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"]
+        deny: ["SEND_MESSAGES"]
+      - role: "Member"
+        allow: ["SEND_MESSAGES"]
+
+  - name: "rules"
+    type: "text"
+    category: "Information"
+    topic: "Server rules — read before participating."
+    permission_overwrites:
+      - role: "@everyone"
+        allow: ["VIEW_CHANNEL", "READ_MESSAGE_HISTORY"]
+        deny: ["SEND_MESSAGES"]
+      - role: "Admin"
+        allow: ["SEND_MESSAGES", "MANAGE_MESSAGES"]
+
+  - name: "general"
+    type: "text"
+    category: "Community"
+    topic: "General discussion."
+
+  - name: "voice-chat"
+    type: "voice"
+    category: "Voice"
+    bitrate: 64000
+    user_limit: 10
+    rtc_region: "us-west"
+
+  - name: "stage"
+    type: "stage"
+    category: "Voice"
+    bitrate: 64000
+
+  - name: "announcements"
+    type: "announcement"
+    category: "Information"
+
+  - name: "suggestions"
+    type: "forum"
+    category: "Community"
+    default_forum_layout: 0        # 0=LIST 1=GALLERY
+    default_sort_order: 0          # 0=LATEST_ACTIVITY 1=CREATION_DATE
+    default_thread_rate_limit_per_user: 0
+
+  - name: "media"
+    type: "media"                  # media channel (forum-like)
+    category: "Community"
+
+  - name: "mod-log"
+    type: "text"
+    category: "Admin"
+    permission_overwrites:
+      - role: "@everyone"
+        deny: ["VIEW_CHANNEL"]
+
+# ── Emojis ───────────────────────────────────────────
+emojis:
+  - name: "pepe"
+    image: "./assets/pepe.png"
+    roles: []                      # empty = available to all
+  - name: "blobcat"
+    image: "./assets/blobcat.png"
+    roles: ["Member"]
+
+# ── Stickers ─────────────────────────────────────────
+stickers:
+  - name: "cool_sticker"
+    description: "A cool sticker"
+    tags: "cool,awesome"
+    image: "./assets/sticker.png"  # must be PNG/APNG/Lottie, max 512KB
+
+# ── Webhooks ─────────────────────────────────────────
+webhooks:
+  - name: "GitHub"
+    channel: "announcements"
+    avatar: "./assets/gh-avatar.png"
+
+# ── Auto Moderation ──────────────────────────────────
+auto_mod:
+  rules:
+    - name: "No Spam"
+      enabled: true
+      event_type: 1                # 1=MESSAGE_SEND 2=MEMBER_UPDATE
+      trigger_type: 3              # 3=SPAM
+      trigger_metadata: {}
+      actions:
+        - type: 1                  # 1=BLOCK_MESSAGE
+        - type: 2                  # 2=SEND_ALERT_MESSAGE
+          metadata:
+            channel: "mod-log"
+        - type: 3                  # 3=TIMEOUT (duration seconds)
+          metadata:
+            duration_seconds: 300
+
+    - name: "No Links"
+      enabled: true
+      event_type: 1
+      trigger_type: 1              # 1=KEYWORD
+      trigger_metadata:
+        keyword_filter:
+          - "discord.gg/stealinvite"
+          - "bit.ly/*"
+          - "tinyurl.com/*"
+        regex_patterns: []
+        allow_list: []
+      actions:
+        - type: 1
+        - type: 2
+          metadata:
+            channel: "mod-log"
+
+    - name: "Mention Limit"
+      enabled: true
+      event_type: 1
+      trigger_type: 5              # 5=MENTION_SPAM
+      trigger_metadata:
+        mention_total_limit: 10
+        mention_role_limit: 3
+      actions:
+        - type: 1
+        - type: 3
+          metadata:
+            duration_seconds: 600
+
+    - name: "No Malicious Files"
+      enabled: true
+      event_type: 1
+      trigger_type: 4              # 4=KEYWORD_PRESET
+      trigger_metadata:
+        presets: [1, 2, 3]        # 1=SWEARING 2=SEXUAL_CONTENT 3=SLURS
+      actions:
+        - type: 1
+        - type: 2
+          metadata:
+            channel: "mod-log"
+
+# ── Welcome Screen ───────────────────────────────────
+welcome_screen:
+  enabled: true
+  description: "Welcome to **My Server**! Pick a channel to get started."
+  welcome_channels:
+    - channel: "welcome"
+      description: "Start here — read the rules and introduce yourself"
+      emoji_name: "👋"
+    - channel: "rules"
+      description: "Server rules"
+      emoji_name: "📜"
+    - channel: "general"
+      description: "General chat"
+      emoji_name: "💬"
+
+# ── Onboarding ───────────────────────────────────────
+onboarding:
+  enabled: true
+  mode: 0                          # 0=ONBOARDING_DEFAULT 1=ONBOARDING_ADVANCED
+  prompts:
+    - type: 0                      # 0=MULTIPLE_CHOICE 1=DROPDOWN
+      title: "What brings you here?"
+      single_select: false
+      required: true
+      in_onboarding: true
+      options:
+        - title: "Gaming"
+          description: "Find people to play with"
+          emoji_name: "🎮"
+          channel_ids: ["general"]
+          role_ids: []
+        - title: "Development"
+          description: "Talk about code"
+          emoji_name: "💻"
+          channel_ids: ["general"]
+          role_ids: ["dev"]
+        - title: "Just browsing"
+          description: "Check things out"
+          emoji_name: "👀"
+          channel_ids: ["general"]
+          role_ids: []
+    - type: 1
+      title: "Your experience level"
+      single_select: true
+      required: true
+      in_onboarding: true
+      options:
+        - title: "Beginner"
+          description: "New to the community"
+          emoji_name: "🌟"
+          role_ids: ["beginner"]
+          channel_ids: []
+        - title: "Veteran"
+          description: "Experienced member"
+          emoji_name: "🔥"
+          role_ids: ["veteran"]
+          channel_ids: []
+  default_channel_ids: ["general"]
+
+# ── Vanity URL (requires boost level 3) ──────────────
+vanity_url_code: "myserver"
+
+# ── Widget ────────────────────────────────────────────
+widget:
+  enabled: true
+  channel: "general"
+
+# ── Invite Splash ────────────────────────────────────
+invite_splash: "./assets/splash.png"</code></pre>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="api-endpoints">
+    <h2>4. API Endpoints &amp; Payloads</h2>
+    <p>All endpoints against <code>https://discord.com/api/v10</code>. Bot token in <code>Authorization: Bot &lt;token&gt;</code> header. Content-Type: <code>application/json</code> (except multipart for file uploads).</p>
+
+    <h3>4.1 Guild Management</h3>
+    <table>
+      <thead><tr><th>Endpoint</th><th>Method</th><th>Purpose</th><th>Key Fields</th></tr></thead>
+      <tbody>
+        <tr><td><code>/guilds/{guild.id}</code></td><td>GET</td><td>Fetch current guild state</td><td>name, icon, splash, banner, description, verification_level, default_message_notifications, explicit_content_filter, afk_channel_id, afk_timeout, system_channel_id, premium_progress_bar_enabled, preferred_locale, nsfw_level, mfa_level, rules_channel_id, public_updates_channel_id</td></tr>
+        <tr><td><code>/guilds/{guild.id}</code></td><td>PATCH</td><td>Update guild settings</td><td><em>same fields as GET</em></td></tr>
+        <tr><td><code>/guilds/{guild.id}/channels</code></td><td>GET</td><td>List all channels (incl. categories)</td><td>Returns array of channel objects with id, type, name, position, parent_id, permission_overwrites, topic, nsfw, bitrate, etc.</td></tr>
+        <tr><td><code>/guilds/{guild.id}/roles</code></td><td>GET</td><td>List all roles</td><td>Returns array of role objects with id, name, color, hoist, position, permissions, mentionable, tags, icon, unicode_emoji</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 Channel Operations</h3>
+    <div class="endpoint-detail">
+      <h4>POST /guilds/{guild.id}/channels — Create Channel</h4>
+      <div class="code-block">
+        <pre><code>{
+  "name": "general",                  // 2-100 chars, lowercase, no spaces
+  "type": 0,                          // 0=TEXT 2=VOICE 4=CATEGORY 5=ANNOUNCEMENT
+                                      // 13=STAGE 15=FORUM 16=MEDIA
+  "topic": "General discussion",      // 0-1024 chars (text/announcement)
+  "position": 1,                      // relative ordering
+  "permission_overwrites": [          // max 1000
+    {
+      "id": "123456789012345678",     // role or user snowflake
+      "type": 0,                      // 0=ROLE 1=MEMBER
+      "allow": "1024",                // permission bit string
+      "deny": "2048"
+    }
+  ],
+  "parent_id": "987654321098765432",  // category ID (null for top-level)
+  "nsfw": false,
+  "rate_limit_per_user": 0,           // slowmode in seconds (0-21600)
+  "bitrate": 64000,                   // voice only: 8000-384000 (varies by boost)
+  "user_limit": 0,                    // voice only: 0-99
+  "rtc_region": "us-west",            // voice/stage: null=auto
+  "video_quality_mode": 1,            // voice: 1=AUTO 2=FULL_720P
+  "default_auto_archive_duration": 4320,  // 60, 1440, 4320, 10080
+  "default_thread_rate_limit_per_user": 0,
+  "default_sort_order": 0,            // forum: 0=LATEST_ACTIVITY 1=CREATION_DATE
+  "default_forum_layout": 0           // forum: 0=LIST 1=GALLERY
+}</code></pre>
+      </div>
+
+      <h4>PATCH /channels/{channel.id} — Modify Channel</h4>
+      <p>Same fields as POST. <code>position</code> and <code>parent_id</code> can be used to move channels between categories.</p>
+
+      <h4>DELETE /channels/{channel.id} — Delete Channel</h4>
+      <p>No body. Returns channel object. 403 if not deletable or bot lacks MANAGE_CHANNELS.</p>
+
+      <h4>PUT /guilds/{guild.id}/channels — Bulk Channel Positions</h4>
+      <div class="code-block">
+        <pre><code>[
+  { "id": "111111111111111111", "position": 1, "parent_id": null, "lock_permissions": false },
+  { "id": "222222222222222222", "position": 2, "parent_id": "category_id_here", "lock_permissions": true },
+  { "id": "333333333333333333", "position": 3, "parent_id": "category_id_here", "lock_permissions": false }
+]</code></pre>
+      </div>
+    </div>
+
+    <h3>4.3 Role Operations</h3>
+    <div class="endpoint-detail">
+      <h4>POST /guilds/{guild.id}/roles — Create Role</h4>
+      <div class="code-block">
+        <pre><code>{
+  "name": "Moderator",
+  "permissions": "4398046511103",     // string bigint
+  "color": 0x00AAFF,                  // int color
+  "hoist": true,                      // show in sidebar
+  "mentionable": false,
+  "icon": null,                       // base64 image data URI (boost 2+)
+  "unicode_emoji": null,
+  "position": 2                       // relative position
+}</code></pre>
+      </div>
+
+      <h4>PATCH /roles/{role.id} — Modify Role</h4>
+      <p>Same fields as POST. Also supports <code>permissions</code> changes.</p>
+
+      <h4>DELETE /roles/{role.id} — Delete Role</h4>
+      <p>Cannot delete @everyone, managed roles (bot integrations), or roles with pending premium subscriptions.</p>
+
+      <h4>PATCH /guilds/{guild.id}/roles — Batch Modify Roles (Reorder)</h4>
+      <div class="code-block">
+        <pre><code>[
+  { "id": "role_id_1", "position": 1 },
+  { "id": "role_id_2", "position": 2, "name": "Renamed Role", "color": 0xFF0000 }
+]</code></pre>
+      </div>
+      <p class="note">This endpoint is atomic — either all roles are reordered or none. Use it to finalize role hierarchy after creates/deletes.</p>
+    </div>
+
+    <h3>4.4 Permission Overwrites</h3>
+    <p>Not a separate endpoint — managed via <code>permission_overwrites</code> array on <strong>channel create</strong> and <strong>channel modify</strong>.</p>
+    <div class="code-block">
+      <pre><code>{
+  "id": "123456789012345678",     // snowflake of role or user
+  "type": 0,                      // 0=ROLE 1=MEMBER
+  "allow": "1024",                // string bigint — bitwise permissions to ALLOW
+  "deny": "0"                     // string bigint — bitwise permissions to DENY
+}</code></pre>
+    </div>
+    <p>To update overwrites for a specific role/user on an existing channel, send the full <code>permission_overwrites</code> array on the PATCH. There is no partial-update endpoint — you must mirror the current state with the one change.</p>
+
+    <h3>4.5 Emoji Operations</h3>
+    <div class="endpoint-detail">
+      <h4>POST /guilds/{guild.id}/emojis — Create Emoji</h4>
+      <div class="code-block">
+        <pre><code>// Multipart form (image as file upload)
+// OR JSON with base64:
+{
+  "name": "pepe",
+  "image": "data:image/png;base64,iVBORw0KGgo...",
+  "roles": ["role_id_1", "role_id_2"]  // empty = available to all
+}</code></pre>
+      </div>
+      <p>Max 50 static + 50 animated (boosted servers get more). Animated emojis require <code>image: "data:image/gif;base64,..."</code>.</p>
+
+      <h4>PATCH /guilds/{guild.id}/emojis/{emoji.id}</h4>
+      <p>Update name or roles restriction. <code>image</code> optional.</p>
+
+      <h4>DELETE /guilds/{guild.id}/emojis/{emoji.id}</h4>
+      <p>Removes the emoji from the server.</p>
+    </div>
+
+    <h3>4.6 Webhook Operations</h3>
+    <div class="endpoint-detail">
+      <h4>POST /channels/{channel.id}/webhooks — Create Webhook</h4>
+      <div class="code-block">
+        <pre><code>{
+  "name": "GitHub",
+  "avatar": "data:image/png;base64,..."  // optional, base64 image
+}</code></pre>
+      </div>
+
+      <h4>GET /channels/{channel.id}/webhooks — List Channel Webhooks</h4>
+      <h4>GET /guilds/{guild.id}/webhooks — List All Guild Webhooks</h4>
+      <h4>PATCH /webhooks/{webhook.id} — Modify Webhook</h4>
+      <h4>DELETE /webhooks/{webhook.id} — Delete Webhook</h4>
+    </div>
+
+    <h3>4.7 Auto Moderation</h3>
+    <div class="endpoint-detail">
+      <h4>POST /guilds/{guild.id}/auto-moderation/rules</h4>
+      <div class="code-block">
+        <pre><code>{
+  "name": "No Spam",
+  "event_type": 1,                  // 1=MESSAGE_SEND 2=MEMBER_UPDATE
+  "trigger_type": 3,                // 1=KEYWORD 2=HARMFUL_LINK 3=SPAM 4=KEYWORD_PRESET
+                                     // 5=MENTION_SPAM 6=MEMBER_PROFILE
+  "trigger_metadata": {
+    "keyword_filter": ["badword"],
+    "regex_patterns": [],
+    "presets": [1, 2, 3],           // 1=SWEARING 2=SEXUAL_CONTENT 3=SLURS
+    "allow_list": ["goodword"],
+    "mention_total_limit": 10,
+    "mention_role_limit": 3,
+    "mention_raid_protection_enabled": true
+  },
+  "actions": [
+    { "type": 1 },                   // 1=BLOCK_MESSAGE
+    { "type": 2, "metadata": { "channel_id": "mod_log_channel_id", "duration_seconds": null } },
+    { "type": 3, "metadata": { "channel_id": null, "duration_seconds": 300 } },
+    { "type": 4 }                    // 4=BLOCK_MEMBER_INTERACTION
+  ],
+  "enabled": true,
+  "exempt_roles": ["role_id"],
+  "exempt_channels": ["channel_id"]
+}</code></pre>
+      </div>
+      <p>Max 100 rules per guild. Deleting a rule requires MANAGE_GUILD permission.</p>
+    </div>
+
+    <h3>4.8 Welcome Screen</h3>
+    <div class="endpoint-detail">
+      <h4>GET /guilds/{guild.id}/welcome-screen</h4>
+      <h4>PATCH /guilds/{guild.id}/welcome-screen</h4>
+      <div class="code-block">
+        <pre><code>{
+  "enabled": true,
+  "description": "Welcome to the server!",
+  "welcome_channels": [
+    {
+      "channel_id": "channel_snowflake",
+      "description": "Start here",
+      "emoji_id": null,           // custom emoji ID, or null
+      "emoji_name": "👋"           // emoji name (unicode or custom name)
+    }
+  ]
+}</code></pre>
+      </div>
+      <p>Requires guild to have COMMUNITY enabled. Max 5 welcome channels.</p>
+    </div>
+
+    <h3>4.9 Onboarding</h3>
+    <div class="endpoint-detail">
+      <h4>GET /guilds/{guild.id}/onboarding</h4>
+      <h4>PUT /guilds/{guild.id}/onboarding</h4>
+      <div class="code-block">
+        <pre><code>{
+  "prompts": [
+    {
+      "type": 0,                    // 0=MULTIPLE_CHOICE 1=DROPDOWN
+      "title": "What brings you here?",
+      "single_select": false,
+      "required": true,
+      "in_onboarding": true,
+      "options": [
+        {
+          "title": "Gaming",
+          "description": "Find people to play with",
+          "emoji_id": null,         // custom emoji ID
+          "emoji_name": "🎮",        // unicode or custom emoji name
+          "emoji": null,            // partial emoji object (alternative to id/name)
+          "channel_ids": ["channel_snowflake"],
+          "role_ids": ["role_snowflake"]
+        }
+      ]
+    }
+  ],
+  "default_channel_ids": ["channel_snowflake"],
+  "enabled": true,
+  "mode": 0                         // 0=ONBOARDING_DEFAULT 1=ONBOARDING_ADVANCED
+}</code></pre>
+      </div>
+      <p>Requires COMMUNITY guild. Critical for new member experience — if you're automating server setup, this is one of the most important endpoints.</p>
+    </div>
+
+    <h3>4.10 Member Management</h3>
+    <div class="endpoint-detail">
+      <h4>GET /guilds/{guild.id}/members — List Members</h4>
+      <p>Requires GUILD_MEMBERS intent. Paginated (limit=1-1000, after snowflake).</p>
+
+      <h4>PATCH /guilds/{guild.id}/members/{user.id} — Modify Member</h4>
+      <div class="code-block">
+        <pre><code>{
+  "nick": "New Nickname",           // null to remove
+  "roles": ["role_id_1", "role_id_2"],  // REPLACES all roles
+  "mute": false,                    // voice
+  "deaf": false,                    // voice
+  "channel_id": null,               // move to voice channel
+  "communication_disabled_until": null  // ISO8601, timeout
+}</code></pre>
+      </div>
+
+      <h4>PUT /guilds/{guild.id}/members/{user.id}/roles/{role.id} — Add Role</h4>
+      <p>204 No Content on success. Idempotent.</p>
+
+      <h4>DELETE /guilds/{guild.id}/members/{user.id}/roles/{role.id} — Remove Role</h4>
+    </div>
+
+    <h3>4.11 Invites</h3>
+    <div class="endpoint-detail">
+      <h4>POST /channels/{channel.id}/invites — Create Invite</h4>
+      <div class="code-block">
+        <pre><code>{
+  "max_age": 86400,                 // seconds (0=infinite, 86400=24h)
+  "max_uses": 0,                    // 0=unlimited
+  "temporary": false,               // kick on disconnect if not assigned role
+  "unique": true,                   // true = new code each time, false = reuse existing
+  "target_type": null,              // 1=STREAM 2=EMBEDDED_APPLICATION
+  "target_user_id": null,
+  "target_application_id": null
+}</code></pre>
+      </div>
+    </div>
+
+    <h3>4.12 Vanity URL</h3>
+    <div class="endpoint-detail">
+      <h4>PATCH /guilds/{guild.id}/vanity-url</h4>
+      <div class="code-block">
+        <pre><code>{ "code": "myserver" }</code></pre>
+      </div>
+      <p>Requires boost level 3 (14 boosts). Returns 403 if guild doesn't meet the requirement.</p>
+    </div>
+
+    <h3>4.13 Guild Template</h3>
+    <div class="endpoint-detail">
+      <h4>GET /guilds/{guild.id}/templates — List Templates</h4>
+      <h4>POST /guilds/{guild.id}/templates — Create Template from Guild</h4>
+      <div class="code-block">
+        <pre><code>{ "name": "My Template", "description": "Template for my server" }</code></pre>
+      </div>
+      <h4>POST /guilds/templates/{template.code} — Create Guild from Template</h4>
+      <div class="code-block">
+        <pre><code>{ "name": "New Server Name", "icon": null }</code></pre>
+      </div>
+      <p class="note">Templates are a <strong>one-time snapshot</strong>, not a live sync mechanism. They're useful for bootstrapping but cannot replace a reconciliation engine for ongoing config management.</p>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="reconciliation">
+    <h2>5. Reconciliation Engine</h2>
+    <p>The core of the system. A three-phase engine that computes and applies the minimal set of API calls to converge the live guild to the desired config.</p>
+
+    <h3>5.1 Phase 1: Fetch Current State</h3>
+    <div class="phase-card">
+      <p>Parallel API calls to build a complete snapshot:</p>
+      <ul>
+        <li><code>GET /guilds/{id}</code> — guild metadata</li>
+        <li><code>GET /guilds/{id}/channels</code> — all channels (incl. categories), with permission_overwrites</li>
+        <li><code>GET /guilds/{id}/roles</code> — all roles with permissions</li>
+        <li><code>GET /guilds/{id}/emojis</code> — all emojis</li>
+        <li><code>GET /guilds/{id}/stickers</code> — all stickers</li>
+        <li><code>GET /guilds/{id}/webhooks</code> — all webhooks</li>
+        <li><code>GET /guilds/{id}/auto-moderation/rules</code> — all auto-mod rules</li>
+        <li><code>GET /guilds/{id}/welcome-screen</code> — welcome screen config</li>
+        <li><code>GET /guilds/{id}/onboarding</code> — onboarding config</li>
+        <li><code>GET /guilds/{id}/vanity-url</code> — vanity URL</li>
+        <li><code>GET /guilds/{id}/widget</code> — widget settings</li>
+      </ul>
+      <p>All results are cached in a <code>GuildState</code> object keyed by snowflake IDs.</p>
+    </div>
+
+    <h3>5.2 Phase 2: Diff &amp; Plan</h3>
+    <div class="phase-card">
+      <p>Compare each domain between <code>DesiredState</code> (from config) and <code>CurrentState</code> (from API). Generate an ordered <code>ActionPlan</code>:</p>
+
+      <div class="code-block">
+        <pre><code>interface ActionPlan {
+  actions: Action[];
+  summary: {
+    creates: number;
+    updates: number;
+    deletes: number;
+    skips: number;
+  };
+  dry_run: boolean;
+}
+
+interface Action {
+  type: "CREATE" | "UPDATE" | "DELETE" | "SKIP";
+  domain: "guild" | "role" | "category" | "channel" | "permission_overwrite"
+        | "emoji" | "sticker" | "webhook" | "auto_mod_rule"
+        | "welcome_screen" | "onboarding" | "vanity_url" | "widget";
+  resource: string;                    // human-readable name
+  endpoint: string;                    // API endpoint
+  method: "POST" | "PATCH" | "PUT" | "DELETE";
+  payload: object | null;
+  reason: string;                      // why this action is needed
+  dependencies: string[];              // resource IDs that must exist first
+}</code></pre>
+      </div>
+
+      <h4>Matching Strategy (Identity Resolution)</h4>
+      <p>How to tell if a resource in the config corresponds to a resource in the live guild:</p>
+      <table>
+        <thead><tr><th>Resource</th><th>Match Key</th><th>Fallback</th></tr></thead>
+        <tbody>
+          <tr><td>Role</td><td><code>name</code> (unique within guild)</td><td>—</td></tr>
+          <tr><td>Category</td><td><code>name</code> + <code>type=4</code></td><td>—</td></tr>
+          <tr><td>Channel</td><td><code>name</code> + <code>parent_id</code> (category)</td><td><code>name</code> alone</td></tr>
+          <tr><td>Emoji</td><td><code>name</code></td><td>hash comparison on image</td></tr>
+          <tr><td>Webhook</td><td><code>name</code> + <code>channel_id</code></td><td><code>name</code> alone</td></tr>
+          <tr><td>Auto-mod rule</td><td><code>name</code></td><td>—</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Diff Logic per Domain</h4>
+      <table>
+        <thead><tr><th>Domain</th><th>Comparison</th><th>CREATE</th><th>UPDATE</th><th>DELETE</th></tr></thead>
+        <tbody>
+          <tr><td>Guild</td><td>Field-by-field on guild metadata</td><td>N/A (guild exists)</td><td>Any field differs</td><td>N/A</td></tr>
+          <tr><td>Role</td><td>name, color, hoist, permissions, mentionable, icon</td><td>Name not in current roles</td><td>Any field differs</td><td>Role in current but not in config</td></tr>
+          <tr><td>Category</td><td>name, position</td><td>Name not in current categories</td><td>Any field differs</td><td>Category in current but not in config</td></tr>
+          <tr><td>Channel</td><td>name, type, topic, nsfw, bitrate, slowmode, etc.</td><td>Name+parent not matched</td><td>Any field differs</td><td>Channel in current but not in config</td></tr>
+          <tr><td>Permission Overwrite</td><td>role+allow+deny per channel</td><td>Role not in channel's overwrites</td><td>Allow/deny bits differ</td><td>Overwrite exists but not in config</td></tr>
+          <tr><td>Emoji</td><td>name (+ image hash)</td><td>Name not in current emojis</td><td>Name matches but roles differ</td><td>Emoji in current but not in config</td></tr>
+          <tr><td>Auto-mod rule</td><td>trigger_type, trigger_metadata, actions</td><td>Name not in current rules</td><td>Any field differs</td><td>Rule in current but not in config</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>5.3 Phase 3: Execute</h3>
+    <div class="phase-card">
+      <p>Walk the ActionPlan in order, respecting dependencies, with rate-limit awareness:</p>
+
+      <div class="code-block">
+        <pre><code>async function executePlan(plan: ActionPlan, guildId: string) {
+  for (const action of plan.actions) {
+    // 1. Check all dependencies resolved
+    assert(action.dependencies.every(dep =&gt; resolved.has(dep)));
+
+    // 2. Apply with rate-limit aware HTTP client
+    await rateLimitedFetch(action.endpoint, {
+      method: action.method,
+      headers: { "Authorization": `Bot ${token}`, "Content-Type": "application/json" },
+      body: action.payload ? JSON.stringify(action.payload) : undefined,
+    });
+
+    // 3. Track created resource IDs for downstream dependencies
+    if (action.type === "CREATE") {
+      resolved.set(action.resource, response.id);
+    }
+  }
+}</code></pre>
+      </div>
+
+      <p><strong>Safety features:</strong></p>
+      <ul>
+        <li><strong>Dry-run mode:</strong> <code>--dry-run</code> flag prints the ActionPlan without executing anything. Shows what would be created, updated, and deleted.</li>
+        <li><strong>Confirmation prompt:</strong> Before any DELETE action, prompt user for confirmation. Can be skipped with <code>--yes</code>.</li>
+        <li><strong>Backup:</strong> Before destructive changes, export current state to a JSONL backup file with timestamps.</li>
+        <li><strong>Incremental rollback:</strong> If a batch of creates fails mid-way, the system can optionally tear down what it just created (configurable).</li>
+      </ul>
+    </div>
+
+    <h3>5.4 Watch Mode &amp; Auto-Reconciliation</h3>
+    <div class="phase-card">
+      <p>Two approaches to detect changes and re-sync:</p>
+
+      <h4>A) File Watcher (Config Changes)</h4>
+      <ul>
+        <li><code>inotify</code> (Linux) / <code>kqueue</code> (macOS) / <code>ReadDirectoryChangesW</code> (Windows)</li>
+        <li>Debounce: wait 500ms after last file change before triggering re-reconciliation</li>
+        <li>On trigger: re-parse config, re-diff, prompt user for changes (or auto-apply if <code>--auto</code>)</li>
+      </ul>
+
+      <h4>B) Gateway Event Listener (Manual Discord Changes)</h4>
+      <ul>
+        <li>Connect to Discord Gateway (WebSocket) with <code>GUILD_SCHEDULED_EVENTS</code>, <code>GUILDS</code>, <code>GUILD_MODERATION</code> intents</li>
+        <li>Listen for: <code>CHANNEL_CREATE</code>, <code>CHANNEL_UPDATE</code>, <code>CHANNEL_DELETE</code>, <code>GUILD_ROLE_CREATE</code>, <code>GUILD_ROLE_UPDATE</code>, <code>GUILD_ROLE_DELETE</code>, <code>GUILD_UPDATE</code>, <code>GUILD_EMOJIS_UPDATE</code>, <code>WEBHOOKS_UPDATE</code></li>
+        <li>Option A: <strong>Corrective</strong> — detect divergence from config and auto-revert to desired state (can be annoying if users are making temporary changes)</li>
+        <li>Option B: <strong>Advisory</strong> — log the divergence, send a notification, but don't auto-correct</li>
+        <li>Option C: <strong>Interval-based</strong> — poll full state every N minutes and reconcile if drift detected. Simpler, no Gateway connection needed.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="permissions">
+    <h2>6. Permissions Model</h2>
+
+    <h3>6.1 Bot Invite Permissions</h3>
+    <p>The bot needs these permissions to do its job. The OAuth2 invite URL encodes them as a bitfield integer:</p>
+
+    <div class="code-block">
+      <pre><code>https://discord.com/api/oauth2/authorize
+  ?client_id=YOUR_CLIENT_ID
+  &amp;scope=bot%20applications.commands
+  &amp;permissions=8  # Administrator — covers everything</code></pre>
+    </div>
+
+    <p>Or compute the precise permission integer (recommended for production, avoids the "bot has too much power" scare):</p>
+
+    <table>
+      <thead><tr><th>Permission</th><th>Hex</th><th>Decimal</th></tr></thead>
+      <tbody>
+        <tr><td>MANAGE_GUILD</td><td>0x20</td><td>32</td></tr>
+        <tr><td>MANAGE_ROLES</td><td>0x10000000</td><td>268435456</td></tr>
+        <tr><td>MANAGE_CHANNELS</td><td>0x10</td><td>16</td></tr>
+        <tr><td>KICK_MEMBERS</td><td>0x2</td><td>2</td></tr>
+        <tr><td>BAN_MEMBERS</td><td>0x4</td><td>4</td></tr>
+        <tr><td>MANAGE_WEBHOOKS</td><td>0x20000000</td><td>536870912</td></tr>
+        <tr><td>MANAGE_EMOJIS_AND_STICKERS</td><td>0x400000000</td><td>17179869184</td></tr>
+        <tr><td>VIEW_AUDIT_LOG</td><td>0x80</td><td>128</td></tr>
+        <tr><td>MODERATE_MEMBERS</td><td>0x1000000000</td><td>68719476736</td></tr>
+        <tr><td>MANAGE_MESSAGES</td><td>0x2000</td><td>8192</td></tr>
+        <tr><td>MENTION_EVERYONE</td><td>0x20000</td><td>131072</td></tr>
+        <tr><td>CREATE_GUILD_EXPRESSIONS</td><td>0x8000000000</td><td>34359738368</td></tr>
+        <tr><td>VIEW_CHANNEL</td><td>0x400</td><td>1024</td></tr>
+        <tr><td>SEND_MESSAGES</td><td>0x800</td><td>2048</td></tr>
+        <tr><td>READ_MESSAGE_HISTORY</td><td>0x10000</td><td>65536</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>Tip:</strong> Use Discord's <a href="https://discordapi.com/permissions.html">Permission Calculator</a> to compute the integer. The sum of all permissions above (excluding Administrator) is <code>1125899906842623</code> — use this for "almost everything except Administrator".
+    </div>
+
+    <h3>6.2 Role Hierarchy &amp; @everyone</h3>
+    <p>Critical constraints the reconciler must respect:</p>
+    <ul>
+      <li><strong>@everyone is special:</strong> always exists, cannot be deleted, position is always <code>n-1</code> (bottom). The bot must <em>modify</em> it, not create it.</li>
+      <li><strong>Bot role position:</strong> The bot's highest role must be above the roles it needs to manage. If the bot's role is at position 5, it cannot create/edit roles at positions 1-4.</li>
+      <li><strong>Managed roles:</strong> Roles created by bot integrations (OAuth2, webhooks) have <code>managed: true</code> and cannot be modified or deleted.</li>
+      <li><strong>Role deletion order:</strong> Delete from highest position to lowest to avoid permission errors.</li>
+      <li><strong>Permission escalation:</strong> A role with ADMINISTRATOR (0x8) bypasses all channel-specific overwrites. The reconciler must account for this when computing effective permissions.</li>
+    </ul>
+
+    <h3>6.3 Permission Overwrite Resolution</h3>
+    <p>Discord resolves permissions in this order of precedence:</p>
+    <ol>
+      <li><strong>@everyone role</strong> — base permissions for everyone</li>
+      <li><strong>Role overwrites</strong> — per-role allow/deny on the channel</li>
+      <li><strong>Member-specific overwrites</strong> — per-user allow/deny on the channel</li>
+    </ol>
+    <p>Within each level, DENY overrides ALLOW. ADMINISTRATOR bypasses all overwrites entirely.</p>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="bot-setup">
+    <h2>7. Bot Setup &amp; Invitation Flow</h2>
+
+    <h3>7.1 Creating the Discord Application</h3>
+    <ol>
+      <li>Go to <a href="https://discord.com/developers/applications">Discord Developer Portal</a></li>
+      <li>Click "New Application" → give it a name</li>
+      <li>Go to <strong>Bot</strong> tab → "Add Bot"</li>
+      <li>Configure intents (toggle these ON):
+        <ul>
+          <li><code>GUILD_MEMBERS</code> (Privileged) — required for member role assignment, member list</li>
+          <li><code>MESSAGE_CONTENT</code> (Privileged) — required for reading message content (auto-mod, etc.)</li>
+          <li><code>GUILD_MODERATION</code> — required for auto-mod rule management</li>
+          <li><code>GUILD_EXPRESSIONS</code> — required for emoji/sticker management</li>
+          <li><code>GUILD_WEBHOOKS</code> — required for webhook management</li>
+          <li>All other non-privileged intents as needed</li>
+        </ul>
+      </li>
+      <li>Copy the <strong>Bot Token</strong> — this is the bot's credential for API calls</li>
+      <li>Go to <strong>OAuth2 → URL Generator</strong>:
+        <ul>
+          <li>Scopes: <code>bot</code>, <code>applications.commands</code></li>
+          <li>Bot Permissions: <code>Administrator</code> (or computed permission integer)</li>
+          <li>Copy the generated URL</li>
+        </ul>
+      </li>
+    </ol>
+
+    <div class="code-block">
+      <div class="code-header">Invite URL (generated)</div>
+      <pre><code>https://discord.com/api/oauth2/authorize?client_id=123456789012345678&amp;scope=bot+applications.commands&amp;permissions=8</code></pre>
+    </div>
+
+    <h3>7.2 Bot Joins a Guild</h3>
+    <p>When a user clicks the invite URL and selects a server:</p>
+    <ol>
+      <li>Discord sends <code>GUILD_CREATE</code> event on the Gateway WebSocket</li>
+      <li>Bot receives the full guild object with all channels, roles, and members</li>
+      <li>Bot triggers reconciliation: <code>plan()</code> → <code>apply()</code></li>
+      <li>Bot sends a welcome message to the system channel or first available text channel</li>
+    </ol>
+
+    <h3>7.3 Multi-Guild Support</h3>
+    <p>The bot can serve multiple guilds simultaneously. Each guild has its own config file (or config section). State is keyed by <code>guild_id</code>:</p>
+    <div class="code-block">
+      <pre><code>~/.server-bot/
+  configs/
+    guild_1234567890.yaml   # config for guild A
+    guild_0987654321.yaml   # config for guild B
+  state/
+    1234567890.json          # cached current state
+    0987654321.json
+  backups/
+    1234567890_2025-01-01T00:00:00Z.jsonl</code></pre>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="rate-limits">
+    <h2>8. Rate Limits &amp; Backoff Strategy</h2>
+    <p>Discord applies per-route and global rate limits. The reconciler must be resilient to both.</p>
+
+    <h3>8.1 Rate Limit Rules</h3>
+    <table>
+      <thead><tr><th>Limit Type</th><th>Default</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td>Per-route</td><td>50 requests/sec per bucket</td><td>429 with <code>Retry-After</code> header. Bucket identified by <code>X-RateLimit-Bucket</code></td></tr>
+        <tr><td>Global</td><td>50 requests/sec total</td><td>429 with <code>Retry-After</code> AND <code>X-RateLimit-Global: true</code></td></tr>
+        <tr><td>Webhook</td><td>30 requests/sec</td><td>Separate bucket from normal API calls</td></tr>
+        <tr><td>Guild create</td><td>10 per 10 minutes</td><td>Soft limit, enforced as 429</td></tr>
+        <tr><td>Channel create</td><td>Effective per-route but heavy bursts discouraged</td><td>Bulk creates may trigger 429</td></tr>
+      </tbody>
+    </table>
+
+    <h3>8.2 Rate Limit Client Design</h3>
+    <div class="code-block">
+      <pre><code>class RateLimitedClient:
+  buckets: dict[str, Bucket]  # keyed by bucket hash
+  global_remaining: int = 50
+  global_reset_at: float
+
+  async def request(self, method, endpoint, **kwargs):
+    # 1. Wait for global rate limit headroom
+    await self.wait_for_global()
+
+    # 2. Wait for route bucket headroom
+    bucket = self.get_bucket_for(endpoint)
+    await bucket.wait_for_slot()
+
+    # 3. Execute
+    response = await http_client.request(method, endpoint, **kwargs)
+
+    # 4. Update bucket state from headers
+    if "X-RateLimit-Bucket" in response.headers:
+      bucket_hash = response.headers["X-RateLimit-Bucket"]
+      self.buckets[bucket_hash].update_from_headers(response.headers)
+
+    # 5. Handle 429
+    if response.status == 429:
+      retry_after = float(response.headers.get("Retry-After", 1))
+      if response.headers.get("X-RateLimit-Global"):
+        await asyncio.sleep(retry_after)
+        return await self.request(method, endpoint, **kwargs)  # retry
+      else:
+        bucket = self.buckets.get(bucket_hash)
+        if bucket:
+          await bucket.wait_for_reset(retry_after)
+        return await self.request(method, endpoint, **kwargs)
+
+    return response</code></pre>
+    </div>
+
+    <h3>8.3 Bulk Operation Batching</h3>
+    <p>When creating many channels/roles (e.g., 50 channels from config), batch them with delays:</p>
+    <ul>
+      <li>Insert 200ms delay between each create/modify/delete call</li>
+      <li>Use <code>PATCH /guilds/{guild.id}/roles</code> for batch role reordering instead of individual calls</li>
+      <li>Use <code>PUT /guilds/{guild.id}/channels</code> for bulk channel position updates</li>
+      <li>Fetch state before and after bulk operations to refresh cached IDs</li>
+    </ul>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="deployment">
+    <h2>9. Deployment Models</h2>
+
+    <div class="deployment-grid">
+      <div class="deployment-card">
+        <h3>CLI Tool</h3>
+        <p><strong>Best for:</strong> Developers, server admins who want full control.</p>
+        <ul>
+          <li>Single binary (Go/Rust) or Python package</li>
+          <li>Config file on disk, YAML/JSON/TOML</li>
+          <li>Commands: <code>plan</code>, <code>apply</code>, <code>watch</code>, <code>diff</code>, <code>export</code>, <code>validate</code></li>
+          <li>Run locally or on a VPS</li>
+          <li>File watcher + Gateway for auto-reconciliation</li>
+        </ul>
+      </div>
+
+      <div class="deployment-card">
+        <h3>SaaS Dashboard</h3>
+        <p><strong>Best for:</strong> Non-technical users, managed service.</p>
+        <ul>
+          <li>Web app (React/Vue + Node/Python backend)</li>
+          <li>User OAuth2 login → manages their own bot instance</li>
+          <li>Visual config builder (drag-and-drop channels, role editor)</li>
+          <li>Hosted bot fleet, one per customer guild</li>
+          <li>Pricing: per-server or per-config tier</li>
+        </ul>
+      </div>
+
+      <div class="deployment-card">
+        <h3>GitOps</h3>
+        <p><strong>Best for:</strong> Teams that already use infrastructure-as-code.</p>
+        <ul>
+          <li>Config in a GitHub/GitLab repo</li>
+          <li>CI/CD pipeline runs <code>plan</code> and posts diff as PR comment</li>
+          <li>Merge to main triggers <code>apply</code></li>
+          <li>Git history = audit trail of server changes</li>
+          <li>GitHub Actions / GitLab CI / ArgoCD-style</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Tech Stack Recommendations</h3>
+    <table>
+      <thead><tr><th>Component</th><th>Option A (Python)</th><th>Option B (Go)</th><th>Option C (Node/TS)</th></tr></thead>
+      <tbody>
+        <tr><td>Discord API lib</td><td>discord.py (async)</td><td>discordgo</td><td>discord.js</td></tr>
+        <tr><td>Config parsing</td><td>PyYAML + pydantic</td><td>gopkg.in/yaml.v3</td><td>js-yaml + zod</td></tr>
+        <tr><td>File watcher</td><td>watchdog</td><td>fsnotify</td><td>chokidar</td></tr>
+        <tr><td>HTTP client</td><td>httpx + rate-limit adapter</td><td>net/http + custom</td><td>undici + custom</td></tr>
+        <tr><td>CLI framework</td><td>click/typer</td><td>cobra</td><td>commander</td></tr>
+        <tr><td>Diff engine</td><td>deepdiff</td><td>go-cmp</td><td>deep-diff</td></tr>
+        <tr><td>State persistence</td><td>SQLite (aiosqlite)</td><td>BoltDB/SQLite</td><td>better-sqlite3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="edge-cases">
+    <h2>10. Edge Cases &amp; Pitfalls</h2>
+
+    <div class="edge-case">
+      <h3>10.1 Role Hierarchy Violations</h3>
+      <p><strong>Problem:</strong> The bot's highest role must be above any role it tries to create or modify. If the bot's role is at position 5, it cannot create a role at position 2.</p>
+      <p><strong>Solution:</strong> The reconciler checks the bot's own role position (<code>GET /users/@me/guilds/{id}/member</code> → <code>roles</code> → resolve highest position). If configured roles exceed the bot's max position, emit a warning and skip those roles.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.2 Channel Name Conflicts</h3>
+      <p><strong>Problem:</strong> Discord allows duplicate channel names. Two channels named "general" in different categories are valid. The reconciler must use <code>name + parent_id</code> as the identity key, not just name.</p>
+      <p><strong>Solution:</strong> Channels are matched by <code>(name, parent_id)</code> tuple. If a channel is moved to a different category in the config, the reconciler detects it as a parent_id change (UPDATE) rather than a DELETE + CREATE.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.3 Default Channel Deletion</h3>
+      <p><strong>Problem:</strong> <code>#general</code> is created by Discord when the guild is created. It has special system properties. Deleting it requires setting <code>system_channel_id</code> to another channel first.</p>
+      <p><strong>Solution:</strong> The reconciler checks if the target channel is the guild's system channel, rules channel, public updates channel, or AFK channel. If so, it reassigns those guild settings to an alternative before deleting.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.4 Managed (Integration) Roles</h3>
+      <p><strong>Problem:</strong> Roles created by Discord integrations (e.g., Twitch, YouTube, bots) have <code>managed: true</code>. They cannot be modified or deleted by other bots.</p>
+      <p><strong>Solution:</strong> The reconciler <strong>skips</strong> managed roles entirely. They are filtered out during state fetch and never matched against config roles. If a config role name conflicts with a managed role, emit a warning.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.5 Permission Integer Overflow</h3>
+      <p><strong>Problem:</strong> Discord permissions are 64-bit integers, but JavaScript loses precision above 2^53. Python and Go handle this natively, but Node/TS must use BigInt.</p>
+      <p><strong>Solution:</strong> Permissions are represented as <strong>strings</strong> in JSON payloads. The reconciler uses string-based bigint comparison for diffing, and parses to the native type only for bitwise operations.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.6 Community Guild Requirements</h3>
+      <p><strong>Problem:</strong> Welcome screen, onboarding, announcements, rules channels, and several other features require the guild to be a <strong>Community</strong> server. A freshly created guild is not Community by default.</p>
+      <p><strong>Solution:</strong> The reconciler checks <code>guild.features.includes("COMMUNITY")</code>. If the config uses community features but the guild is not Community, the reconciler must first enable Community mode via <code>PATCH /guilds/{id}</code> with the required fields (<code>rules_channel_id</code>, <code>public_updates_channel_id</code>, <code>verification_level</code>).</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.7 Boost-Level Gated Features</h3>
+      <p><strong>Problem:</strong> Vanity URLs (boost 3), animated server icon (boost 1/2), role icons (boost 2), and higher bitrate (boost-dependent) are gated by server boost level.</p>
+      <p><strong>Solution:</strong> The reconciler checks <code>guild.premium_tier</code> before attempting to configure boost-gated features. If the tier is insufficient, skip the feature and log a warning.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.8 Rate Limit Cascading</h3>
+      <p><strong>Problem:</strong> Applying a large config (50+ channels, 15+ roles) triggers many API calls in quick succession. Hitting a 429 can cascade into a 10-minute global cooldown.</p>
+      <p><strong>Solution:</strong> Implement a <strong>progressive delay</strong> strategy: start with 100ms between calls, increase by 50ms after every 429, decrease by 10ms after every 10 consecutive successes. Log rate limit bucket stats for observability.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.9 Concurrent Edits</h3>
+      <p><strong>Problem:</strong> A server admin manually changes something while the bot is reconciling. The bot's cached state is now stale, and its next API call may fail or overwrite the admin's change.</p>
+      <p><strong>Solution:</strong> Use <strong>optimistic concurrency</strong>: re-fetch the affected resource before updating it. If the current state differs from the cached state, abort the action and re-plan. This is expensive but safe. For the watch mode, use a debounce: if the admin is actively editing, wait for 30 seconds of inactivity before re-reconciling.</p>
+    </div>
+
+    <div class="edge-case">
+      <h3>10.10 Config Validation</h3>
+      <p><strong>Problem:</strong> A malformed config (e.g., a channel referencing a non-existent role, a category that doesn't exist, bad permissions string) can cause the reconciler to fail mid-way.</p>
+      <p><strong>Solution:</strong> Pre-flight validation phase:</p>
+      <ul>
+        <li>All <code>category</code> references in channels must match a category name in the config</li>
+        <li>All <code>role</code> references in permission_overwrites must match a role name</li>
+        <li>All <code>channel</code> references in webhooks/auto-mod/welcome/onboarding must match</li>
+        <li>Permission strings must be valid integers (not exceed 2^64-1)</li>
+        <li>Channel names: 2-100 chars, lowercase, no spaces</li>
+        <li>Role names: 1-100 chars</li>
+        <li>Emoji names: 2-32 chars, alphanumeric + underscore</li>
+        <li>Topic: max 1024 chars</li>
+        <li>Slowmode: 0-21600</li>
+        <li>Bitrate: 8000-384000</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================================================================== -->
+  <section id="conclusion">
+    <h2>Conclusion</h2>
+    <p>This architecture turns Discord server management into <strong>infrastructure-as-code</strong>. The core insight is that every Discord API resource maps to a declarative config field, and the reconciliation pattern (fetch → diff → apply) is well-established in systems like Terraform, Kubernetes, and Ansible.</p>
+    <p>The hardest parts are not the API calls — they're the <strong>dependency ordering</strong> (roles before channels, channels before webhooks), the <strong>identity resolution</strong> (matching config names to live snowflakes), and the <strong>edge cases</strong> (community mode, boost gates, managed roles, concurrency).</p>
+    <p>A solid implementation in Python or Go with the right rate-limit client and a well-structured diff engine is about 3,000-5,000 lines of core code, plus another 1,000-2,000 for the CLI and config schema.</p>
+  </section>
+</main>
+
+<footer>
+  <p>Generated for analysis purposes. Discord API subject to change — always refer to <a href="https://discord.com/developers/docs">discord.com/developers/docs</a> for the latest.</p>
+</footer>
+
+</body></html>
