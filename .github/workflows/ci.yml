@@ -50,6 +50,7 @@ jobs:
   e2e:
     name: Live E2E (disposable guild)
     # Manual (workflow_dispatch) or nightly (schedule) only — never on push/PR.
+    # Skips (green) when no E2E secrets are configured; fails on partial/mismatched config.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -61,21 +62,37 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Require E2E secrets
+      - name: Check E2E credentials
+        id: creds
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
           E2E_ALLOW_GUILD_ID: ${{ secrets.E2E_ALLOW_GUILD_ID }}
         run: |
-          [ -n "$DISCORD_TOKEN" ] || { echo "::error::DISCORD_TOKEN secret is required"; exit 1; }
-          [ -n "$DISCORD_GUILD_ID" ] || { echo "::error::DISCORD_GUILD_ID secret is required"; exit 1; }
-          [ -n "$E2E_ALLOW_GUILD_ID" ] || { echo "::error::E2E_ALLOW_GUILD_ID secret is required (no default-allow)"; exit 1; }
-          [ "$DISCORD_GUILD_ID" = "$E2E_ALLOW_GUILD_ID" ] || { echo "::error::E2E_ALLOW_GUILD_ID must exactly match DISCORD_GUILD_ID"; exit 1; }
+          set -eu
+          present=0
+          if [ -n "${DISCORD_TOKEN:-}" ]; then present=$((present + 1)); fi
+          if [ -n "${DISCORD_GUILD_ID:-}" ]; then present=$((present + 1)); fi
+          if [ -n "${E2E_ALLOW_GUILD_ID:-}" ]; then present=$((present + 1)); fi
+          # No E2E secrets at all: E2E is simply not enabled for this repo —
+          # skip so scheduled runs stay green instead of failing nightly.
+          if [ "$present" -eq 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::DISCORD_TOKEN / DISCORD_GUILD_ID / E2E_ALLOW_GUILD_ID are not set — skipping live E2E."
+            exit 0
+          fi
+          # Partially configured or mismatched: misconfiguration — fail loudly.
+          [ -n "${DISCORD_TOKEN:-}" ] || { echo "::error::DISCORD_TOKEN secret is required"; exit 1; }
+          [ -n "${DISCORD_GUILD_ID:-}" ] || { echo "::error::DISCORD_GUILD_ID secret is required"; exit 1; }
+          [ -n "${E2E_ALLOW_GUILD_ID:-}" ] || { echo "::error::E2E_ALLOW_GUILD_ID secret is required (no default-allow)"; exit 1; }
+          [ "${DISCORD_GUILD_ID:-}" = "${E2E_ALLOW_GUILD_ID:-}" ] || { echo "::error::E2E_ALLOW_GUILD_ID must exactly match DISCORD_GUILD_ID"; exit 1; }
 
       - name: Install dependencies
+        if: steps.creds.outputs.skip != 'true'
         run: npm ci
 
       - name: Run live E2E
+        if: steps.creds.outputs.skip != 'true'
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}

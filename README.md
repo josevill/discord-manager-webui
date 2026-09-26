@@ -119,6 +119,8 @@ unit + integration with the coverage gate, and the Playwright WebUI
 self-tests. Live E2E is a separate job (manual dispatch or nightly cron)
 that requires the `DISCORD_TOKEN`, `DISCORD_GUILD_ID`, and
 `E2E_ALLOW_GUILD_ID` secrets (the allowlist must exactly match the guild).
+If none of the three secrets is set the E2E job is skipped so scheduled
+runs stay green; a partially configured or mismatched pair fails the job.
 
 ## Requirements
 

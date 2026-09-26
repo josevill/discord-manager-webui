@@ -14,7 +14,7 @@
 
 - This repo is declarative Discord guild IaC: YAML/JSON config → validate / plan / apply via the TypeScript `discord-manager` CLI.
 - Runtime state lives under `~/.discord-manager/` (backups and audit); no SQLite.
-- The repo is git-versioned (branch `main`) with GitHub Actions CI (`.github/workflows/ci.yml`: typecheck → lint → build → unit+integration + coverage gate → Playwright on push/PR; live E2E is a separate manual/nightly job gated on `DISCORD_TOKEN`/`DISCORD_GUILD_ID`/`E2E_ALLOW_GUILD_ID` secrets) and an ISC `LICENSE`.
+- The repo is git-versioned (branch `main`) with GitHub Actions CI (`.github/workflows/ci.yml`: typecheck → lint → build → unit+integration + coverage gate → Playwright on push/PR; live E2E is a separate manual/nightly job gated on `DISCORD_TOKEN`/`DISCORD_GUILD_ID`/`E2E_ALLOW_GUILD_ID` secrets — all absent → job skips (green), partial or mismatched → hard fail) and an ISC `LICENSE`.
 - `~/.discord-manager/state/<guildId>.json` (written by export/apply/UI-fetch) is surfaced by `discord-manager state [-g guild] [--json]`; `apply`/`watch --keep N` prunes same-guild backups to the latest N and rotates audit logs file-level at ~5 MiB (default keeps everything; live audit logs stay append-only).
 - `discord.js` is an `optionalDependency` — lazy-loaded only by `watch --gateway`, which fails fast with an install hint when it is missing.
 - Mutation audit logs are append-only JSONL at `~/.discord-manager/audit/<guildId>.jsonl` for apply runs from CLI, WebUI, and watch.
